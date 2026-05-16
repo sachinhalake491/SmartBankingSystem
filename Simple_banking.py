@@ -2,119 +2,113 @@ import tkinter as tk
 from datetime import datetime
 import os
 
-# ----------- BACKEND -----------
+class BankAccount:
+    def __init__(self, filename="transactions.txt"):
+        self.filename = filename
+        self.balance = self._load_balance()
 
-def save_transaction(type, amount, balance):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open("transactions.txt", "a", encoding='utf-8') as file:
-        file.write(f"{timestamp} | {type} | Amount: ₹{amount} | Balance: ₹{balance}\n")
+    def _save_transaction(self, trans_type, amount):
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(self.filename, "a", encoding="utf-8") as f:
+            f.write(f"{ts} | {trans_type} | Amount: ₹{amount} | Balance: ₹{self.balance}\n")
 
-def deposit_money(balance, amount):
-    balance += amount
-    save_transaction("Deposit", amount, balance)
-    return balance
-
-def withdraw_money(balance, amount):
-    if amount <= balance:
-        balance -= amount
-        save_transaction("Withdraw", amount, balance)
-        return balance, "Withdraw successful"
-    else:
-        return balance, "Insufficient balance"
-
-def show_history():
-    try:
-        if not os.path.exists("transactions.txt"):
-            return "No transactions found."
-        with open("transactions.txt", "r", encoding='utf-8') as file:
-            return file.read()
-    except:
-        return "Error reading history."
-
-def load_balance():
-    if not os.path.exists("transactions.txt"):
+    def _load_balance(self):
+        if not os.path.exists(self.filename):
+            return 0
+        try:
+            lines = open(self.filename, encoding="utf-8").readlines()
+            if lines and "Balance:" in lines[-1]:
+                return int(lines[-1].strip().split("Balance: ₹")[1])
+        except Exception:
+            pass
         return 0
-    try:
-        with open("transactions.txt", "r", encoding='utf-8') as file:
-            lines = file.readlines()
-            if not lines: return 0
-            last_line = lines[-1].strip()
-            # Find the balance at the end of the line
-            if "Balance:" in last_line:
-                return int(last_line.split("Balance: ₹")[1].strip())
-    except:
-        pass
-    return 0
 
-# ----------- GUI -----------
+    def deposit(self, amount):
+        self.balance += amount
+        self._save_transaction("Deposit", amount)
+        return True, f"Deposited ₹{amount} successfully!"
 
-balance = load_balance()
+    def withdraw(self, amount):
+        if amount <= self.balance:
+            self.balance -= amount
+            self._save_transaction("Withdraw", amount)
+            return True, "Withdraw successful"
+        return False, "Insufficient balance"
 
-def check_balance():
-    result_label.config(text=f"Current Balance: ₹{balance}", fg="black")
+    def get_balance(self): return self.balance
 
-def deposit():
-    global balance
-    try:
-        amount_str = entry_amount.get().strip()
-        amount = int(amount_str)
-        if amount <= 0: raise ValueError
-        balance = deposit_money(balance, amount)
-        result_label.config(text=f"Deposited ₹{amount} successfully!", fg="green")
-        entry_amount.delete(0, tk.END)
-    except:
-        result_label.config(text="Enter valid positive amount", fg="red")
+    def get_history(self):
+        try:
+            if not os.path.exists(self.filename):
+                return "No transactions found."
+            content = open(self.filename, encoding="utf-8").read()
+            return content or "No transactions found."
+        except Exception:
+            return "Error reading history."
 
-def withdraw():
-    global balance
-    try:
-        amount_str = entry_amount.get().strip()
-        amount = int(amount_str)
-        if amount <= 0: raise ValueError
-        balance, msg = withdraw_money(balance, amount)
-        color = "green" if "successful" in msg else "red"
-        result_label.config(text=msg, fg=color)
-        if "successful" in msg:
-            entry_amount.delete(0, tk.END)
-    except:
-        result_label.config(text="Enter valid positive amount", fg="red")
 
-def history():
-    data = show_history()
-    # Display history in a simple popup or the label
-    # Given the request for "simple", I'll use a simple Toplevel for history
-    history_win = tk.Toplevel(root)
-    history_win.title("History")
-    tk.Label(history_win, text="Transaction History", font=("Arial", 12, "bold")).pack(pady=10)
-    txt = tk.Text(history_win, height=15, width=50)
-    txt.insert(tk.END, data)
-    txt.config(state="disabled")
-    txt.pack(padx=10, pady=10)
+class BankingApp:
+    def __init__(self, root):
+        self.root = root
+        self.account = BankAccount()
+        root.title("Simple Banking")
+        root.geometry("350x450")
+        root.configure(padx=20, pady=20)
+        self._create_widgets()
 
-# ----------- WINDOW -----------
+    def _create_widgets(self):
+        tk.Label(self.root, text="BANKING SYSTEM", font=("Arial", 18, "bold")).pack(pady=10)
+        tk.Label(self.root, text="Enter Amount (₹):").pack(pady=(10, 0))
+        self.entry = tk.Entry(self.root, font=("Arial", 12), justify="center")
+        self.entry.pack(pady=5)
 
-root = tk.Tk()
-root.title("Simple Banking")
-root.geometry("350x450")
-root.configure(padx=20, pady=20)
+        bp = {"width": 20, "pady": 5, "font": ("Arial", 10)}
+        tk.Button(self.root, text="Check Balance",  command=self.check_balance,               **bp).pack(pady=5)
+        tk.Button(self.root, text="Deposit",        command=self.deposit,  bg="#e1f5fe",      **bp).pack(pady=5)
+        tk.Button(self.root, text="Withdraw",       command=self.withdraw, bg="#fff3e0",      **bp).pack(pady=5)
+        tk.Button(self.root, text="View History",   command=self.show_history,                **bp).pack(pady=5)
 
-tk.Label(root, text="BANKING SYSTEM", font=("Arial", 18, "bold")).pack(pady=10)
+        self.result = tk.Label(self.root, text="Welcome!", wraplength=300,
+                               font=("Arial", 10, "italic"), fg="blue")
+        self.result.pack(pady=20)
+        tk.Button(self.root, text="Exit", command=self.root.quit, fg="gray", relief="flat").pack(pady=10)
 
-tk.Label(root, text="Enter Amount (₹):").pack(pady=(10, 0))
-entry_amount = tk.Entry(root, font=("Arial", 12), justify="center")
-entry_amount.pack(pady=5)
+    def _get_amount(self):
+        try:
+            a = int(self.entry.get().strip())
+            return a if a > 0 else None
+        except ValueError:
+            return None
 
-# Buttons
-btn_params = {"width": 20, "pady": 5, "font": ("Arial", 10)}
-tk.Button(root, text="Check Balance", command=check_balance, **btn_params).pack(pady=5)
-tk.Button(root, text="Deposit", command=deposit, bg="#e1f5fe", **btn_params).pack(pady=5)
-tk.Button(root, text="Withdraw", command=withdraw, bg="#fff3e0", **btn_params).pack(pady=5)
-tk.Button(root, text="View History", command=history, **btn_params).pack(pady=5)
+    def _show(self, msg, color): self.result.config(text=msg, fg=color)
 
-# Output Area
-result_label = tk.Label(root, text="Welcome!", wraplength=300, font=("Arial", 10, "italic"), fg="blue")
-result_label.pack(pady=20)
+    def check_balance(self): self._show(f"Current Balance: ₹{self.account.get_balance()}", "black")
 
-tk.Button(root, text="Exit", command=root.quit, fg="gray", relief="flat").pack(pady=10)
+    def deposit(self):
+        a = self._get_amount()
+        if a is None: self._show("Enter valid positive amount", "red"); return
+        ok, msg = self.account.deposit(a)
+        self._show(msg, "green" if ok else "red")
+        self.entry.delete(0, tk.END)
 
-root.mainloop()
+    def withdraw(self):
+        a = self._get_amount()
+        if a is None: self._show("Enter valid positive amount", "red"); return
+        ok, msg = self.account.withdraw(a)
+        self._show(msg, "green" if ok else "red")
+        if ok: self.entry.delete(0, tk.END)
+
+    def show_history(self):
+        win = tk.Toplevel(self.root)
+        win.title("Transaction History")
+        tk.Label(win, text="Transaction History", font=("Arial", 12, "bold")).pack(pady=10)
+        txt = tk.Text(win, height=15, width=55)
+        txt.insert(tk.END, self.account.get_history())
+        txt.config(state="disabled")
+        txt.pack(padx=10, pady=10)
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    BankingApp(root)
+    root.mainloop()
